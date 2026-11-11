@@ -192,7 +192,8 @@ description: 自動テストを書くときに使う。プロジェクトの形�
 | ライブラリ | 公開された関数・クラス | 多くは依存なし。入力と出力の関係が常に成り立つ性質（並べ替えても要素数は変わらない、など）があれば、fast-check などのプロパティベーステストで多数の入力を自動生成して確かめる |
 | CLI | プロセスを起動し、引数・標準入力を与える | 標準出力・標準エラー出力・終了コードを確かめる。ファイルは一時ディレクトリに作る |
 | Web API | HTTP の要求を、プロセス内またはローカルのサーバーに送る | DB はコンテナで動かす本物か、フェイクにする。他のサービスとの間で要求と応答の形を約束している場合は、契約テストで双方の食い違いを確かめる |
-| 画面（SPA） | コンポーネントを描画し、利用者と同じ操作をする | HTTP 通信は、テスト用の HTTP の仕組み（Angular の `HttpTestingController`、MSW など）で応答を固定する |
+| 画面（SPA） | コンポーネントを描画し、利用者と同じ操作をする（Angular は `TestBed`、Svelte は `@testing-library/svelte`） | HTTP 通信は、テスト用の HTTP の仕組み（Angular の `HttpTestingController`、MSW など）で応答を固定する |
+| SvelteKit のサーバー側 | `load`・form actions・`+server.ts` の関数に、テスト用に組み立てた引数（`params`・`request`・`fetch` など）を渡して呼ぶ。画面からサーバーまで通す確認は Playwright で行う | DB や外部 API は、`$lib/server/` の中の自分たちのモジュールをフェイクやスタブに置き換える |
 | MCP サーバー | MCP のクライアントからツールを呼ぶ（SDK のメモリ上の通信を使う） | `tools/list` の応答のスキーマ、成功時の結果、失敗時の `isError: true` を確かめる |
 | バッチ処理・データ移行 | 入力のデータを用意して処理を実行する | 処理の前後で件数と中身を比べる |
 
@@ -201,6 +202,16 @@ description: 自動テストを書くときに使う。プロジェクトの形�
 - Angular 21 以降の新しいプロジェクトでは Vitest が標準のテストランナーですが、Karma と Jasmine も引き続きサポートされています。どちらを使うかは、プロジェクトの設定に従います。
 - 時間の経過に依存する処理は、フェイクタイマー（`fakeAsync` / `tick`、`vi.useFakeTimers()`）で時間を進めます。
 - RxJS のストリームで、時間と値の順序が振る舞いである場合は、`TestScheduler` によるマーブルテストを使います。
+
+### Svelte / SvelteKit の場合
+
+- テストランナーは Vitest、E2E は Playwright が標準です（`npx sv add vitest`、`npx sv add playwright` で追加できます）。
+- **ロジックはコンポーネントの外でテストできないか先に検討します。** 計算や状態の変化を `.ts` または `.svelte.ts` に置けば、コンポーネントを描画せずに Small のテストで確かめられます。
+- **runes を使うコードのテストファイルは、ファイル名に `.svelte` を含めます**（例: `cart.svelte.test.ts`）。名前に `.svelte` が無いと、テストの中で `$state` などを使えません。
+- **`$effect` を含むコードのテストは、`$effect.root(() => { ... })` の中で実行し、最後に戻り値のクリーンアップ関数を呼びます。** effect は通常、少し後で実行されるので、確認の前に `flushSync()` を呼んで、保留中の effect と DOM の更新を反映させます。
+- **コンポーネントのテストは `@testing-library/svelte` の `render`・`screen`・`userEvent` で書きます。** `mount` を直接使う書き方は、コンポーネントの構造の変更に弱くなります。jsdom で動かす場合は、`vite.config` の `test.environment` を `'jsdom'` にします。
+- **双方向バインディング、コンテキスト、props として渡す snippet をテストするときは、テスト専用のラッパーコンポーネントを作ります。**
+- SvelteKit のページを、ルーティング・サーバー側の `load`・form actions まで含めて確かめる場合は、Playwright の `webServer` の設定でアプリを起動し、画面から操作します。
 
 ## このスキルで扱わないこと
 
@@ -227,3 +238,4 @@ description: 自動テストを書くときに使う。プロジェクトの形�
 - ISTQB Certified Tester Foundation Level シラバス v4.0 第 4 章（テスト分析と設計）
 - Testing Library: Guiding Principles: https://testing-library.com/docs/guiding-principles/
 - StrykerJS: https://stryker-mutator.io/
+- Svelte: Testing: https://svelte.dev/docs/svelte/testing
